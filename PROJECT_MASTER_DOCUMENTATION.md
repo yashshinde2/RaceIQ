@@ -57,8 +57,8 @@ $$\Delta t_{\text{drain}} = \frac{E_{\text{battery}}}{P_{\text{mgu\_k}}} = \frac
 - Formula 1 officially removed broadcast battery graphics in July 2026 (CEO Stefano Domenicali: *"no one is interested in how you drive your car"*).
 - Third-party telemetry APIs (OpenF1, FastF1, Nitrous devlog March 2026) explicitly state that Energy Modes and Active Aero states are entirely absent from the data feeds.
 
-### 1.4 The "DRS Elimination" & Overtake Mode
-Traditional Drag Reduction System (DRS) rear wing flaps are eliminated. They are replaced by two distinct systems:
+### 1.4 Active Aero & Overtake Mode
+The 2026 aerodynamic and overtaking systems are distinct systems:
 1. **Active Aero (Straight Mode / Corner Mode)**: Available to **all cars** at designated track zones, regardless of gap. Does not require proximity.
 2. **Overtake Mode (Manual Boost)**: Proximity-gated. If an attacking car is within the **FIA Detection Gap** ($\le 1.0\text{ s}$) at the Detection Line, it receives:
    - **$+0.5\text{ MJ}$ extra deployable electrical energy** for the following lap ($9.0\text{ MJ}$ vs $8.5\text{ MJ}$).

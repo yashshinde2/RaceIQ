@@ -14,7 +14,7 @@
       "year": 2026
     },
     "Melbourne": {
-      "cached_utc": "2026-09-07T13:11:40.172793+00:00",
+      "cached_utc": "2026-09-13T02:39:58.196695+00:00",
       "circuit": "Melbourne",
       "drivers": 20,
       "event_name": "Melbourne",
@@ -29,7 +29,7 @@
       "year": 2026
     },
     "Monza": {
-      "cached_utc": "2026-09-07T13:12:13.154101+00:00",
+      "cached_utc": "2026-09-13T02:40:50.007668+00:00",
       "circuit": "Monza",
       "drivers": 22,
       "event_name": "Monza",
@@ -44,7 +44,7 @@
       "year": 2026
     },
     "Shanghai": {
-      "cached_utc": "2026-09-07T13:11:55.848932+00:00",
+      "cached_utc": "2026-09-13T02:40:26.432766+00:00",
       "circuit": "Shanghai",
       "drivers": 18,
       "event_name": "Shanghai",
