@@ -38,6 +38,12 @@ interface RaceIQContextValue {
   setSelected: (code: string) => void;
   rival: string;
   setRival: (code: string) => void;
+  tacticalTarget?: RaceIQDriverState | undefined;
+  tacticalRole?: "AHEAD" | "BEHIND";
+  tacticalTargetOf?: (code: string) => {
+    target: RaceIQDriverState | undefined;
+    role: "AHEAD" | "BEHIND";
+  };
   /** Contract accessors — components never reach into a data producer. */
   driver: (code: string) => DriverIdentity;
   stateOf: (code: string) => RaceIQDriverState | undefined;
@@ -66,7 +72,6 @@ export function RaceIQProvider({
   const [time, setTime] = useState(420);
   const [playing, setPlaying] = useState(false);
   const [selected, setSelected] = useState("OCO");
-  const [rival, setRival] = useState("BEA");
   const raf = useRef<number | null>(null);
 
   const circuit = adapter.circuit(circuitId) ?? firstCircuit;
@@ -123,6 +128,50 @@ export function RaceIQProvider({
     return i >= 0 && i < orderedDrivers.length - 1 ? orderedDrivers[i + 1] : undefined;
   };
 
+  const isTracked = (c: string) => Boolean(adapter.driver(c)?.tracked);
+
+  const nonHaasAheadOf = (code: string): RaceIQDriverState | undefined => {
+    const i = orderedDrivers.findIndex((d) => d.code === code);
+    if (i <= 0) return undefined;
+    for (let idx = i - 1; idx >= 0; idx--) {
+      const d = orderedDrivers[idx]!;
+      if (!isTracked(d.code)) return d;
+    }
+    return undefined;
+  };
+
+  const nonHaasBehindOf = (code: string): RaceIQDriverState | undefined => {
+    const i = orderedDrivers.findIndex((d) => d.code === code);
+    if (i < 0 || i >= orderedDrivers.length - 1) return undefined;
+    for (let idx = i + 1; idx < orderedDrivers.length; idx++) {
+      const d = orderedDrivers[idx]!;
+      if (!isTracked(d.code)) return d;
+    }
+    return undefined;
+  };
+
+  const tacticalTargetOf = (
+    code: string,
+  ): { target: RaceIQDriverState | undefined; role: "AHEAD" | "BEHIND" } => {
+    const rec = adapter.recommend?.(snapshot, code);
+    const posture = rec?.posture;
+    const ahead = nonHaasAheadOf(code);
+    const behind = nonHaasBehindOf(code);
+
+    if (posture === "DEFEND") {
+      if (behind) return { target: behind, role: "BEHIND" };
+      return { target: ahead, role: "AHEAD" };
+    }
+    // ATTACK, HOLD, HARVEST, or default
+    if (ahead) return { target: ahead, role: "AHEAD" };
+    return { target: behind, role: "BEHIND" };
+  };
+
+  const currentTactical = tacticalTargetOf(selected);
+  const tacticalTarget = currentTactical.target;
+  const tacticalRole = currentTactical.role;
+  const rival = tacticalTarget?.code ?? "";
+
   const value: RaceIQContextValue = {
     adapter,
     circuits: adapter.circuits,
@@ -140,17 +189,16 @@ export function RaceIQProvider({
     setSelected: (code) => {
       setSelected((prev) => {
         // Primary selection is Haas-only: the decision workflow always
-        // represents the tracked team (OCO / BEA). Clicks on other cars must
-        // not become the primary selection — the timing grid routes them to
-        // the secondary comparison via setRival instead.
+        // represents the tracked team (OCO / BEA).
         if (!adapter.driver(code)?.tracked) return prev;
-        if (code === prev) return prev;
-        setRival((r) => (r === code ? prev : r));
         return code;
       });
     },
     rival,
-    setRival,
+    setRival: () => {},
+    tacticalTarget,
+    tacticalRole,
+    tacticalTargetOf,
     driver: (code) => adapter.driver(code) ?? { code },
     stateOf: (code) => snapshot.byCode[code],
     aheadOf,

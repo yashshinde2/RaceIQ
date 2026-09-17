@@ -21,7 +21,7 @@ function formatTyre(tyre?: { compound: string | null; ageLaps: number | null } |
 }
 
 function Row({ d }: { d: RaceIQDriverState }) {
-  const { selected, rival, setSelected, setRival, driver: driverOf } = useRaceIQ();
+  const { selected, rival, setSelected, driver: driverOf } = useRaceIQ();
   const driver = driverOf(d.code);
   const isSelected = d.code === selected;
   const isRival = d.code === rival;
@@ -31,7 +31,7 @@ function Row({ d }: { d: RaceIQDriverState }) {
   return (
     <button
       type="button"
-      onClick={() => (isTracked ? setSelected(d.code) : setRival(d.code))}
+      onClick={() => isTracked && setSelected(d.code)}
       className={`grid w-full grid-cols-[1.5rem_3px_minmax(0,1fr)_3rem_2.8rem_2.2rem] items-center gap-2 rounded border px-2 py-1 text-left transition-colors ${
         isSelected
           ? "border-primary/60 bg-primary/10"
@@ -86,7 +86,7 @@ export function TimingGrid() {
         </div>
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Tap a driver to compare. Gap and tyre state are actual race data; battery % is a RaceIQ estimate.
+        Select a Haas driver to analyze. Tactical opponent, gap, and tyre state are derived automatically from live telemetry.
       </p>
       <div className="mt-3 grid gap-x-4 gap-y-0.5 lg:grid-cols-2">
         {columns.map((col, i) => (

@@ -29,7 +29,7 @@ export const Route = createFileRoute("/live")({
 });
 
 function SelectedDriver() {
-  const { snapshot, selected, rival, setRival, driver: driverOf, stateOf } = useRaceIQ();
+  const { snapshot, selected, driver: driverOf, stateOf } = useRaceIQ();
   const state = stateOf(selected);
   const driver = driverOf(selected);
 
@@ -93,23 +93,6 @@ function SelectedDriver() {
           <dd className="data text-sm font-medium">{state?.ersMode ?? EMPTY}</dd>
         </div>
       </dl>
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-        <span className="text-[11px] text-muted-foreground">Compare against</span>
-        <select
-          value={rival}
-          onChange={(e) => setRival(e.target.value)}
-          aria-label="Comparison driver"
-          className="data rounded border border-border bg-surface-raised px-2 py-1 text-[11px]"
-        >
-          {snapshot.drivers
-            .filter((d) => d.code !== selected)
-            .map((d) => (
-              <option key={d.code} value={d.code}>
-                P{d.position} {d.code}
-              </option>
-            ))}
-        </select>
-      </div>
     </div>
   );
 }

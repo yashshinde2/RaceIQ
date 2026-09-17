@@ -44,11 +44,14 @@ function WhatIf() {
     stateOf,
     recommendationFor,
     whatIf,
+    tacticalTarget,
+    tacticalRole = "AHEAD",
+    adapter,
   } = useRaceIQ();
 
   const state = stateOf(selected);
   const driver = driverOf(selected);
-  const ahead = snapshot.drivers.find((d) => d.position === (state?.position ?? 0) - 1);
+  const haasDrivers = snapshot.drivers.filter((d) => adapter.driver(d.code)?.tracked);
 
   const rec = recommendationFor(selected);
   const recommendedPosture: Posture | undefined = rec?.posture;
@@ -78,7 +81,10 @@ function WhatIf() {
               { k: "Position", v: fmtPosition(state?.position) },
               { k: "Gap ahead", v: state?.position === 1 ? EMPTY : fmtGap(state?.gapAhead, 2) },
               { k: "Battery (est.)", v: fmtPct(state?.soc) },
-              { k: "Car ahead", v: ahead ? `${ahead.code} (P${ahead.position})` : "none" },
+              {
+                k: tacticalRole === "BEHIND" ? "Tactical target (behind)" : "Tactical target (ahead)",
+                v: tacticalTarget ? `${tacticalTarget.code} (P${tacticalTarget.position})` : "none",
+              },
             ].map((i) => (
               <div key={i.k}>
                 <dt className="text-[11px] text-muted-foreground">{i.k}</dt>
@@ -90,12 +96,12 @@ function WhatIf() {
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              aria-label="Driver"
+              aria-label="Controlled Haas Driver"
               className="data rounded-md border border-border bg-surface-raised px-2 py-1 text-xs"
             >
-              {snapshot.drivers.map((d) => (
+              {haasDrivers.map((d) => (
                 <option key={d.code} value={d.code}>
-                  P{d.position} {d.code}
+                  P{d.position} {d.code} (HAAS)
                 </option>
               ))}
             </select>
@@ -116,92 +122,137 @@ function WhatIf() {
         {/* RACEIQ RECOMMENDATION & PROJECTED RESULT */}
         <section className="panel p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="eyebrow">RaceIQ recommends</p>
+            <p className="eyebrow">RaceIQ Decision</p>
             <ProvenanceTag kind="PROJECTED" />
           </div>
 
           {recommendedPosture ? (
             <>
-              {/* RECOMMENDED POSTURE BANNER */}
-              <div className="mt-3 flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-3">
+              {/* RECOMMENDED POSTURE BANNER · THIS LAP */}
+              <div className="mt-3 rounded border border-border bg-surface-raised/80 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    RECOMMENDED CALL · THIS LAP
+                  </span>
+                  {typeof rec?.overtakeEv === "number" && (
+                    <span className="data text-xs font-semibold text-primary">
+                      EV {rec.overtakeEv > 0 ? `+${rec.overtakeEv.toFixed(2)}` : rec.overtakeEv.toFixed(2)} · immediate overtake opportunity
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-baseline gap-3">
                   <span
                     className={`data rounded border px-3 py-1 text-sm font-bold tracking-[0.16em] ${POSTURE_STYLE[recommendedPosture]}`}
                   >
                     {recommendedPosture}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    {rec?.reason ?? "Optimal strategic posture derived from model evaluation."}
-                  </span>
+                  {typeof rec?.passProbability === "number" && (
+                    <span className="data text-sm font-semibold text-foreground">
+                      {fmtPct(rec.passProbability)} immediate pass probability
+                    </span>
+                  )}
                 </div>
-                {branch?.score !== undefined && (
-                  <div className="text-right">
-                    <span className="text-[10px] tracking-widest text-muted-foreground">MODEL SCORE</span>
-                    <p className="data text-sm font-semibold tabular-nums text-foreground">
-                      {branch.score > 0 ? `+${branch.score.toFixed(2)}` : branch.score.toFixed(2)}
-                    </p>
-                  </div>
+                {rec?.reason && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {rec.reason}
+                  </p>
                 )}
               </div>
 
-              {/* PROJECTED RESULT */}
-              <div className="mt-4">
-                <p className="eyebrow">Projected result</p>
-                <dl className="mt-2 grid grid-cols-2 gap-3">
+              {/* 8-LAP STRATEGIC PROJECTION · TIER-2 MPC */}
+              <div className="mt-5 border-t border-border pt-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      {branch?.horizonLaps ?? 8}-LAP STRATEGIC PROJECTION · TIER-2 MPC
+                    </h2>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Counterfactual projection if the recommended posture is sustained across the {branch?.horizonLaps ?? 8}-lap horizon.
+                    </p>
+                  </div>
+                  {branch?.score !== undefined && (
+                    <div className="text-right shrink-0">
+                      <span className="text-[9px] font-semibold tracking-wider text-muted-foreground">
+                        {branch?.horizonLaps ?? 8}-LAP HORIZON SCORE
+                      </span>
+                      <p className="data text-base font-bold tabular-nums text-foreground">
+                        {branch.score > 0 ? `+${branch.score.toFixed(2)}` : branch.score.toFixed(2)}
+                      </p>
+                      <span className="block text-[9px] text-muted-foreground">Higher is better</span>
+                    </div>
+                  )}
+                </div>
+
+                <dl className="mt-4 grid grid-cols-2 gap-3">
                   {[
-                    { k: "Projected position", v: fmtPosition(branch?.projectedPosition) },
-                    { k: "Projected gap", v: fmtSeconds(branch?.projectedGap, 2) },
-                    { k: "Projected battery", v: fmtPct(branch?.projectedSoc) },
                     {
-                      k: "Energy effect",
+                      k: "Projected position",
+                      v: fmtPosition(branch?.projectedPosition),
+                      sub: undefined,
+                    },
+                    {
+                      k: "Projected gap",
+                      v: fmtSeconds(branch?.projectedGap, 2),
+                      sub: undefined,
+                    },
+                    {
+                      k: "Projected battery",
+                      v: fmtPct(branch?.projectedSoc),
+                      sub: `Floor: ${fmtPct((branch?.minSocMj ?? 0.6) / 4.0)}`,
+                    },
+                    {
+                      k: "Net battery consumed",
                       v:
                         typeof branch?.energySpendMj === "number"
-                          ? `${branch.energySpendMj > 0 ? "+" : ""}${branch.energySpendMj.toFixed(2)} MJ`
+                          ? `${branch.energySpendMj.toFixed(2)} MJ`
                           : EMPTY,
+                      sub: "Net consumption over 8-lap horizon",
                     },
                     {
-                      k: "Minimum battery",
-                      v:
-                        typeof branch?.minSocMj === "number"
-                          ? `${branch.minSocMj.toFixed(2)} MJ (${fmtPct(branch.minSocMj / 4.0)})`
-                          : EMPTY,
+                      k: "Immediate pass probability · THIS LAP",
+                      v: fmtPct(rec?.passProbability),
+                      sub: "Tactical straight/corner estimate",
                     },
                     {
-                      k: "Strategic model score",
-                      v:
-                        branch?.score !== undefined
-                          ? branch.score.toFixed(2)
-                          : EMPTY,
-                    },
-                    { k: "Risk", v: branch?.risk ?? EMPTY },
-                    {
-                      k: "Passes / re-passes",
+                      k: `Completed passes / re-passes · ${branch?.horizonLaps ?? 8}-LAP HORIZON`,
                       v:
                         typeof branch?.passesAhead === "number" &&
                         typeof branch?.repassesBehind === "number"
                           ? `${branch.passesAhead} / ${branch.repassesBehind}`
                           : EMPTY,
+                      sub: "Completed position changes",
                     },
                     {
-                      k: "Evaluation horizon",
+                      k: `${branch?.horizonLaps ?? 8}-Lap horizon score`,
                       v:
-                        typeof branch?.horizonLaps === "number"
-                          ? `${branch.horizonLaps} laps`
+                        branch?.score !== undefined
+                          ? `${branch.score > 0 ? "+" : ""}${branch.score.toFixed(2)}`
                           : EMPTY,
+                      sub: "Higher is better · Utility score",
+                    },
+                    {
+                      k: "Horizon risk",
+                      v: branch?.risk ?? EMPTY,
+                      sub: undefined,
                     },
                   ].map((i) => (
-                    <div key={i.k}>
-                      <dt className="text-[11px] text-muted-foreground">{i.k}</dt>
-                      <dd className="data text-sm text-projected">{i.v}</dd>
+                    <div key={i.k} className="rounded border border-border/60 bg-surface-raised/40 p-2">
+                      <dt className="text-[10px] text-muted-foreground leading-tight">{i.k}</dt>
+                      <dd className="data mt-1 text-sm font-semibold text-projected">{i.v}</dd>
+                      {i.sub && <p className="mt-0.5 text-[9px] text-muted-foreground">{i.sub}</p>}
                     </div>
                   ))}
                 </dl>
+
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  Higher is better. This utility score combines race-time effects, battery reserve, and strategic penalties over the {branch?.horizonLaps ?? 8}-lap horizon.
+                </p>
               </div>
 
-              {/* MODEL OUTCOME */}
+              {/* MODEL OUTCOME & MODEL INSIGHT */}
               <div className="mt-4 border-t border-border pt-3">
                 <p className="eyebrow">Model outcome</p>
-                <div className="mt-2 rounded border border-border bg-surface-raised/60 p-3 text-xs">
+                <div className="mt-2 space-y-2 rounded border border-border bg-surface-raised/60 p-3 text-xs">
                   {branch?.outcome ? (
                     <p className="leading-relaxed text-foreground/90">{branch.outcome}</p>
                   ) : (
@@ -209,8 +260,17 @@ function WhatIf() {
                       No model-generated projection available for this state.
                     </p>
                   )}
+                  {recommendedPosture === "ATTACK" ? (
+                    <p className="rounded border border-primary/30 bg-primary/10 p-2 text-xs font-medium text-foreground leading-relaxed">
+                      <b>Model insight:</b> ATTACK is favorable for the immediate overtake opportunity, but sustaining high deployment for the full 8-lap horizon depletes the battery reserve and loses time.
+                    </p>
+                  ) : (
+                    <p className="rounded border border-border/80 bg-surface/50 p-2 text-xs text-muted-foreground leading-relaxed">
+                      <b>Model insight:</b> {recommendedPosture} balances multi-lap energy constraints and track position over the {branch?.horizonLaps ?? 8}-lap horizon.
+                    </p>
+                  )}
                   {branch?.inputsUnavailable && branch.inputsUnavailable.length > 0 && (
-                    <p className="mt-2 border-t border-border/50 pt-2 text-[10px] text-muted-foreground">
+                    <p className="border-t border-border/50 pt-2 text-[10px] text-muted-foreground">
                       Inputs unavailable for this projection: {branch.inputsUnavailable.join(", ")} (not fabricated).
                     </p>
                   )}

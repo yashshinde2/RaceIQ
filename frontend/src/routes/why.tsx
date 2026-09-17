@@ -154,6 +154,8 @@ function Why() {
     analysisSnapshot,
     aheadOf,
     behindOf,
+    tacticalTarget,
+    tacticalRole = "AHEAD",
   } = useRaceIQ();
 
   const [showCalc, setShowCalc] = useState(false);
@@ -175,22 +177,25 @@ function Why() {
   const hmmBelief = opp?.hmmBelief;
   const passFeatures = analysis?.passModel?.features;
   const evBreakdown = analysis?.overtakeEv?.breakdown;
-  const rivalCode = opp?.rivalCode ?? ahead?.code ?? null;
+  const rivalCode = opp?.rivalCode ?? tacticalTarget?.code ?? ahead?.code ?? null;
+  const targetCode = tacticalTarget?.code ?? rivalCode;
 
   const opponentSummary = !rivalCode
-    ? "No car directly ahead — the opponent model is not engaged."
+    ? "No rival directly in battle proximity — the opponent model is not engaged."
     : opp?.trapFlag
       ? `${rivalCode} is conserving aggressively; RaceIQ treats the next overtake window as risky.`
-      : `${rivalCode} is being tracked ahead. No trap signal: the opponent is racing normally.`;
+      : posture === "DEFEND"
+        ? `${rivalCode} is attacking behind (${tacticalRole === "BEHIND" ? "defensive rival" : "rival"}). Hold position and line.`
+        : `${rivalCode} is being tracked ahead. No trap signal: the opponent is racing normally.`;
 
   // 2-3 plain-language reasons, derived from internal model state. Raw model
   // probabilities stay internal to the engine and are never shown here.
   const reasons: string[] = [];
-  if (state && state.position > 1 && ahead && typeof state.gapAhead === "number") {
+  if (state && state.position > 1 && targetCode && typeof state.gapAhead === "number" && posture !== "DEFEND") {
     reasons.push(
       state.gapAhead <= 1.0
-        ? `Gap to ${ahead.code} is inside the overtake window.`
-        : `Gap to ${ahead.code} is outside the overtake window.`,
+        ? `Gap to ${targetCode} is inside the overtake window.`
+        : `Gap to ${targetCode} is outside the overtake window.`,
     );
   }
   if (typeof soc === "number") {
@@ -231,7 +236,7 @@ function Why() {
     const gapBehind = Math.max(0, behind.gapToLeader - state.gapToLeader);
     if (gapBehind < 1.2) {
       reasons.unshift(
-        `Car behind (${behind.code}) is within ${fmtGap(gapBehind)} — hold the racing line.`,
+        `Car behind (${targetCode ?? behind.code}) is within ${fmtGap(gapBehind)} — hold the racing line.`,
       );
     }
   }

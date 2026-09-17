@@ -497,9 +497,23 @@ function getAnalysisSnapshot(
   const factualDriver = lapData?.drivers.find((d) => d.code === code);
   const rec = getRecommendation(snapshot, code);
 
-  // Determine rival: car directly ahead in position, or ahead in snapshot
-  const aheadInSnapshot = snapshot.drivers.find((d) => d.position === driverState.position - 1);
-  const rivalCode = aheadInSnapshot?.code ?? null;
+  // Determine tactical rival: for Haas drivers, tactical opponent must be a non-Haas rival
+  const isHaas = (c: string) => Boolean(DRIVER_BY_CODE[c]?.tracked);
+  const ordered = [...snapshot.drivers].sort((a, b) => a.position - b.position);
+  const myIdx = ordered.findIndex((d) => d.code === code);
+  const nonHaasAhead =
+    myIdx > 0 ? ordered.slice(0, myIdx).reverse().find((d) => !isHaas(d.code)) : undefined;
+  const nonHaasBehind =
+    myIdx >= 0 && myIdx < ordered.length - 1
+      ? ordered.slice(myIdx + 1).find((d) => !isHaas(d.code))
+      : undefined;
+
+  let rivalCode: string | null = null;
+  if (rec?.posture === "DEFEND") {
+    rivalCode = nonHaasBehind?.code ?? nonHaasAhead?.code ?? null;
+  } else {
+    rivalCode = nonHaasAhead?.code ?? nonHaasBehind?.code ?? null;
+  }
   const rivalDriver = rivalCode ? snapshot.byCode[rivalCode] : undefined;
 
   // Build timelines across all completed laps up to current lap
