@@ -1,4 +1,4 @@
-# RaceIQ 2026
+# RaceIQ 2026 🏎️
 
 **Energy & Overtake Intelligence for the 2026 FIA power-unit rules.**
 TrackShift 2026 Innovation Challenge, Plaksha University — Problem 1.
